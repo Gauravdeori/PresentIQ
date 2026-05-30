@@ -60,6 +60,19 @@ export function BulkImportDialog({ classes, open, onOpenChange, onImportSuccess 
         const email = parts[2]?.trim() || '';
         
         if (name && roll) {
+          // Skip header row if it matches common template terms
+          const nameLower = name.toLowerCase();
+          const rollLower = roll.toLowerCase();
+          if (
+            nameLower === 'name' || 
+            nameLower === 'student name' || 
+            nameLower === 'student_name' ||
+            rollLower.includes('roll') || 
+            rollLower.includes('id') ||
+            rollLower === 'roll number'
+          ) {
+            continue;
+          }
           parsed.push({ name, roll, email });
         }
       }

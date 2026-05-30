@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/integrations/firebase/client';
 import { 
@@ -8,32 +8,28 @@ import {
   getDocs, 
   addDoc, 
   setDoc, 
+  getDoc,
   doc, 
   serverTimestamp 
 } from 'firebase/firestore';
 import { 
-  Shield, 
-  Users, 
-  UserCheck, 
-  GraduationCap, 
+  Building, 
   Plus, 
   FileSpreadsheet, 
   TrendingUp, 
-  Building, 
   Copy, 
   BookOpen, 
-  Mail, 
-  Hash, 
-  Calendar,
+  UserCheck, 
+  Users, 
   Loader2,
-  CheckCircle2,
-  Trash2
+  BadgeAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { 
   Dialog, 
   DialogContent, 
@@ -61,6 +57,7 @@ export default function AdminDashboard() {
   const [teachers, setTeachers] = useState<UserProfile[]>([]);
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [overallAttendance, setOverallAttendance] = useState<number>(0);
+  const [instCode, setInstCode] = useState<string>('');
   
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingClass, setIsCreatingClass] = useState(false);
@@ -97,46 +94,68 @@ export default function AdminDashboard() {
       });
       setClasses(fetchedClasses);
 
-      // 2. Fetch all teachers in the institution
+      // 2. Fetch all teachers in the institution (safeguard UIDs by using doc ID)
       const teachersQuery = query(
         collection(db, 'users'),
         where('institutionId', '==', profile.institutionId),
         where('role', '==', 'teacher')
       );
       const teachersSnap = await getDocs(teachersQuery);
-      const fetchedTeachers: UserProfile[] = teachersSnap.docs.map(d => d.data() as UserProfile);
+      const fetchedTeachers: UserProfile[] = teachersSnap.docs.map(d => ({
+        uid: d.id,
+        ...d.data()
+      } as UserProfile));
       setTeachers(fetchedTeachers);
 
-      // 3. Fetch all students in the institution
+      // 3. Fetch all students in the institution (safeguard UIDs by using doc ID)
       const studentsQuery = query(
         collection(db, 'users'),
         where('institutionId', '==', profile.institutionId),
         where('role', '==', 'student')
       );
       const studentsSnap = await getDocs(studentsQuery);
-      const fetchedStudents: UserProfile[] = studentsSnap.docs.map(d => d.data() as UserProfile);
+      const fetchedStudents: UserProfile[] = studentsSnap.docs.map(d => ({
+        uid: d.id,
+        ...d.data()
+      } as UserProfile));
       setStudents(fetchedStudents);
 
-      // 4. Fetch overall attendance rate for all classes combined
-      let totalRecords = 0;
-      let presentRecords = 0;
-
-      for (const c of fetchedClasses) {
-        const recordsQuery = query(
-          collection(db, 'class_attendance_records'),
-          where('class_id', '==', c.id)
-        );
-        const recordsSnap = await getDocs(recordsQuery);
-        recordsSnap.docs.forEach(docSnap => {
-          totalRecords++;
-          if (docSnap.data().status === 'present') {
-            presentRecords++;
-          }
-        });
+      // 4. Fetch Institution Details directly
+      const instDocRef = doc(db, 'institutions', profile.institutionId);
+      const instSnap = await getDoc(instDocRef);
+      if (instSnap.exists()) {
+        setInstCode(instSnap.data().joinCode || '');
       }
 
-      const rate = totalRecords > 0 ? (presentRecords / totalRecords) * 100 : 0;
-      setOverallAttendance(rate);
+      // 5. Fetch overall attendance rate for all classes in parallel
+      if (fetchedClasses.length > 0) {
+        const recordsPromises = fetchedClasses.map(async (c) => {
+          const recordsQuery = query(
+            collection(db, 'class_attendance_records'),
+            where('class_id', '==', c.id)
+          );
+          const snap = await getDocs(recordsQuery);
+          return snap.docs.map(docSnap => docSnap.data().status);
+        });
+
+        const allStatuses = await Promise.all(recordsPromises);
+        let totalRecords = 0;
+        let presentRecords = 0;
+
+        allStatuses.forEach(statuses => {
+          statuses.forEach(status => {
+            totalRecords++;
+            if (status === 'present') {
+              presentRecords++;
+            }
+          });
+        });
+
+        const rate = totalRecords > 0 ? (presentRecords / totalRecords) * 100 : 0;
+        setOverallAttendance(rate);
+      } else {
+        setOverallAttendance(0);
+      }
 
     } catch (e: any) {
       console.error("Error loading dashboard data:", e);
@@ -155,25 +174,43 @@ export default function AdminDashboard() {
   }, [profile?.institutionId]);
 
   const handleCopyCode = () => {
-    if (profile?.institutionId) {
-      // Find joinCode of the institution
-      const instQuery = doc(db, 'institutions', profile.institutionId);
-      getDocs(query(collection(db, 'institutions'), where('id', '==', profile.institutionId))).then(snap => {
-        if (!snap.empty) {
-          const code = snap.docs[0].data().joinCode;
-          navigator.clipboard.writeText(code);
-          toast({
-            title: "Copied!",
-            description: "Institution join code copied to clipboard."
-          });
-        }
+    if (instCode) {
+      navigator.clipboard.writeText(instCode);
+      toast({
+        title: "Copied!",
+        description: `Institution code "${instCode}" copied to clipboard.`
+      });
+    } else {
+      toast({
+        title: "Code not loaded",
+        description: "Join code is still fetching. Please try again.",
+        variant: "destructive"
       });
     }
   };
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!className.trim() || !selectedTeacherId || !profile?.institutionId) return;
+
+    if (!className.trim()) {
+      toast({
+        title: "Class Name Required",
+        description: "Please enter a class name.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedTeacherId || selectedTeacherId === 'none') {
+      toast({
+        title: "Educator Assignment Required",
+        description: "Please assign a teaching faculty member to the classroom.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!profile?.institutionId) return;
 
     setIsCreatingClass(true);
     try {
@@ -252,13 +289,19 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {instCode && (
+            <div className="flex items-center justify-between gap-2.5 px-4 py-2 border rounded-xl bg-slate-50 border-slate-200">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">CODE:</span>
+              <span className="font-mono font-black text-slate-700 tracking-wider text-sm">{instCode}</span>
+            </div>
+          )}
           <Button 
             onClick={handleCopyCode} 
             variant="outline"
             className="h-11 rounded-xl border border-slate-200 font-bold flex items-center gap-2 hover:bg-slate-50"
           >
             <Copy className="h-4 w-4 text-slate-500" />
-            Get Institution Code
+            Copy Invite Code
           </Button>
           <Button 
             onClick={() => setShowCreateClassDialog(true)}
@@ -278,7 +321,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-3xl font-black text-slate-800">{classes.length}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-slate-400 font-bold flex items-center gap-1">
-            <BookOpen className="h-3.5 w-3.5" /> Enrolled in institution
+            <BookOpen className="h-3.5 w-3.5" /> Enrolled classrooms
           </CardContent>
         </Card>
 
@@ -298,14 +341,14 @@ export default function AdminDashboard() {
             <CardTitle className="text-3xl font-black text-slate-800">{students.length}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-slate-400 font-bold flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" /> Registered accounts
+            <Users className="h-3.5 w-3.5" /> Registered student bodies
           </CardContent>
         </Card>
 
         <Card className="border border-slate-200 bg-white rounded-2xl shadow-none">
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-black uppercase tracking-wider text-slate-400">Attendance Rate</CardDescription>
-            <CardTitle className="text-3xl font-black text-slate-850 text-emerald-600">
+            <CardTitle className="text-3xl font-black text-slate-800 text-emerald-600">
               {overallAttendance.toFixed(1)}%
             </CardTitle>
           </CardHeader>
@@ -383,10 +426,10 @@ export default function AdminDashboard() {
         <TabsContent value="teachers" className="pt-6">
           {teachers.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 bg-white rounded-[2rem] border border-slate-200 text-center">
-              <UserCheck className="h-12 w-12 text-slate-300 mb-4" />
-              <h3 className="text-lg font-black text-slate-800">No teachers linked</h3>
+              <BadgeAlert className="h-12 w-12 text-slate-300 mb-4" />
+              <h3 className="text-lg font-black text-slate-800">No educators registered</h3>
               <p className="text-slate-400 font-semibold max-w-sm mt-1 text-sm">
-                Teachers can register using the institution code: <span className="font-black text-slate-700">{profile?.institutionId ? '...' : ''}</span>
+                Educators must sign up using the institution invite code: <span className="font-black font-mono text-slate-700">{instCode || '...'}</span>
               </p>
             </div>
           ) : (
@@ -437,7 +480,7 @@ export default function AdminDashboard() {
               <Users className="h-12 w-12 text-slate-300 mb-4" />
               <h3 className="text-lg font-black text-slate-800">No students linked</h3>
               <p className="text-slate-400 font-semibold max-w-sm mt-1 text-sm">
-                Students can sign up and enter the join code, or you can import them in bulk via CSV.
+                Students can sign up using the invite code, or you can import them in bulk via CSV.
               </p>
             </div>
           ) : (
@@ -483,7 +526,7 @@ export default function AdminDashboard() {
       <Dialog open={showCreateClassDialog} onOpenChange={setShowCreateClassDialog}>
         <DialogContent className="sm:max-w-[450px] rounded-3xl bg-white border border-slate-200">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-slate-855">Add Class Room</DialogTitle>
+            <DialogTitle className="text-2xl font-black text-slate-800">Add Class Room</DialogTitle>
             <DialogDescription className="font-semibold text-slate-500">
               Create a classroom in your institution and assign an educator to it.
             </DialogDescription>
@@ -532,13 +575,18 @@ export default function AdminDashboard() {
                   )}
                 </SelectContent>
               </Select>
+              {teachers.length === 0 && (
+                <p className="text-[10px] font-semibold text-rose-500 ml-1 mt-1">
+                  * Note: You must invite teachers using your Institution Code before assigning them.
+                </p>
+              )}
             </div>
 
             <DialogFooter className="pt-3">
               <Button 
                 type="submit" 
                 className="w-full h-11 rounded-xl font-bold shadow-lg shadow-primary/20"
-                disabled={isCreatingClass || !className.trim() || !selectedTeacherId}
+                disabled={isCreatingClass}
               >
                 {isCreatingClass ? (
                   <>
