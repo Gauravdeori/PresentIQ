@@ -302,6 +302,12 @@ export default function ClassDetail() {
 
       const defaulters = mappedStudents.filter(s => s.percentage < criteria).length;
 
+      if (mappedStudents.length === 0) {
+        toast({ title: "No Students", description: "You need at least one student in the class to generate a report.", variant: "destructive" });
+        setIsGeneratingReport(false);
+        return;
+      }
+
       const aiInsight = await generateAIInsight({
         className: classItem.name,
         totalStudents: mappedStudents.length,
@@ -320,9 +326,9 @@ export default function ClassDetail() {
 
       generateAttendanceReport(reportData, format);
       toast({ title: "Report Ready", description: `Exporting ${format.toUpperCase()} report with AI Insights...` });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating report:", error);
-      toast({ title: "Error", description: "Failed to generate report. Please try again.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to generate report. Please try again.", variant: "destructive" });
     } finally {
       setIsGeneratingReport(false);
     }
