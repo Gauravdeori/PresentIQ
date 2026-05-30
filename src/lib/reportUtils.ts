@@ -64,7 +64,7 @@ export const generateAttendanceReport = (data: ReportData, format: 'pdf' | 'exce
       });
 
       // Summary
-      const finalY = (doc as any).lastAutoTable.cursor.y + 15;
+      const finalY = ((doc as any).lastAutoTable?.finalY || 50) + 15;
       const defaulters = students.filter(s => s.percentage < criteria).length;
       doc.setFontSize(14);
       doc.setTextColor(0);
