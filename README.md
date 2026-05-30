@@ -43,6 +43,6 @@ PresentIQ is a role-based attendance management platform designed for educationa
 
 **Gaurav Deori**
 
-## Employee
+## Co-Author
 
 **Arjun Bora**
