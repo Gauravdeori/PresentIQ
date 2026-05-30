@@ -84,11 +84,15 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === item.url}
+                    isActive={
+                      item.url === '/' 
+                        ? location.pathname === '/' 
+                        : location.pathname.startsWith(item.url)
+                    }
                     tooltip={item.title}
                     className={cn(
                       "transition-all duration-300 rounded-xl my-0.5",
-                      location.pathname === item.url 
+                      (item.url === '/' ? location.pathname === '/' : location.pathname.startsWith(item.url))
                         ? "bg-primary text-primary-foreground hover:bg-primary/95 shadow-md shadow-primary/10" 
                         : "text-slate-600 hover:bg-slate-200/60"
                     )}

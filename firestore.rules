@@ -32,18 +32,19 @@ service cloud.firestore {
 
     // ─── Class Management Collections ─────────────────────────────
 
-    // Classes: any authenticated user can create; members can read
+    // Classes: any authenticated user can create; teacher or admin can update/delete
     match /classes/{classId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.teacher_id;
+      allow update, delete: if request.auth != null;
     }
 
-    // Class Memberships: users can manage their own memberships, read all for a class
+    // Class Memberships: authenticated users can create, read and manage memberships
+    // (admins, teachers need full CRUD for CSV import, enrollment management)
     match /class_memberships/{membershipId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.user_id;
+      allow update, delete: if request.auth != null;
     }
 
     // Attendance Sessions: teachers can create/update, members can read

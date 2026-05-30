@@ -133,16 +133,22 @@ export default function ClassDetail() {
     if (foundClass) {
       setClassItem(foundClass);
       const m = memberships.find(mem => mem.classId === classId);
-      setRole(profile?.role === 'admin' ? 'teacher' : (m?.role || null));
+      // Admin users get teacher-level access, even without a membership
+      if (profile?.role === 'admin') {
+        setRole('teacher');
+      } else {
+        setRole(m?.role || null);
+      }
       setClassNotFound(false);
-    } else if (classes.length === 0 && memberships.length === 0) {
-      // User has no classes at all — but they might have navigated directly
-      // Give it a moment (the class might be loading)
-      setClassNotFound(true);
     } else {
-      setClassNotFound(true);
+      // Only mark as not found if we actually have data loaded (classes or memberships exist)
+      // This prevents flash of 'not found' while data is still loading from Firestore
+      if (classes.length > 0 || memberships.length > 0) {
+        setClassNotFound(true);
+      }
+      // If both are empty, remain in loading state - data may still be fetching
     }
-  }, [classes, memberships, classId, dbLoading]);
+  }, [classes, memberships, classId, dbLoading, profile?.role]);
 
   // Load class detail data (announcements, sessions, records, members)
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/integrations/firebase/client';
 import { 
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [showCreateClassDialog, setShowCreateClassDialog] = useState(false);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!profile?.institutionId) return;
 
     setIsLoading(true);
@@ -167,11 +168,11 @@ export default function AdminDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profile?.institutionId, toast]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [profile?.institutionId]);
+  }, [fetchDashboardData]);
 
   const handleCopyCode = () => {
     if (instCode) {
@@ -408,12 +409,12 @@ export default function AdminDashboard() {
                   <CardContent className="pt-2 border-t border-slate-100/60 bg-slate-50/50 p-4 flex justify-between items-center text-xs">
                     <div className="flex items-center gap-2">
                       <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
-                        {c.teacherName.substring(0, 2).toUpperCase()}
+                        {(c.teacherName || 'NA').substring(0, 2).toUpperCase()}
                       </div>
-                      <span className="font-bold text-slate-700">Educator: {c.teacherName}</span>
+                      <span className="font-bold text-slate-700">Educator: {c.teacherName || 'Unassigned'}</span>
                     </div>
                     <Button variant="ghost" size="sm" className="font-bold text-primary hover:bg-primary/5" asChild>
-                      <a href={`/classes/${c.id}`}>View Class →</a>
+                      <Link to={`/classes/${c.id}`}>View Class →</Link>
                     </Button>
                   </CardContent>
                 </Card>
@@ -449,11 +450,11 @@ export default function AdminDashboard() {
                       <tr key={t.uid} className="hover:bg-slate-50/50">
                         <td className="p-4 pl-6 flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold border border-slate-200">
-                            {t.displayName.substring(0, 2).toUpperCase()}
+                            {(t.displayName || 'NA').substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="font-bold text-slate-800">{t.displayName}</span>
+                          <span className="font-bold text-slate-800">{t.displayName || 'Unknown Teacher'}</span>
                         </td>
-                        <td className="p-4 text-slate-500 font-medium">{t.email}</td>
+                        <td className="p-4 text-slate-500 font-medium">{t.email || '—'}</td>
                         <td className="p-4">
                           <Badge className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-wider px-2 py-0.5">
                             Educator
@@ -500,12 +501,12 @@ export default function AdminDashboard() {
                       <tr key={s.uid} className="hover:bg-slate-50/50">
                         <td className="p-4 pl-6 flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold border border-slate-200">
-                            {s.displayName.substring(0, 2).toUpperCase()}
+                            {(s.displayName || 'NA').substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="font-bold text-slate-800">{s.displayName}</span>
+                          <span className="font-bold text-slate-800">{s.displayName || 'Unknown Student'}</span>
                         </td>
                         <td className="p-4 font-mono text-xs font-bold text-slate-600">{s.rollNumber || '—'}</td>
-                        <td className="p-4 text-slate-500 font-medium">{s.email}</td>
+                        <td className="p-4 text-slate-500 font-medium">{s.email || '—'}</td>
                         <td className="p-4 pr-6 text-right">
                           <Button variant="ghost" size="sm" className="font-bold text-slate-500 hover:text-slate-800" disabled>
                             Manage
