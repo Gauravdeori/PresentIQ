@@ -1,4 +1,8 @@
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export interface AttendanceStats {
   className: string;
@@ -31,37 +35,9 @@ export async function generateAIInsight(stats: AttendanceStats): Promise<string>
   `;
 
   try {
-    // We check if the key has the correct format for OpenRouter (often starts with sk-or-v1-), 
-    // but we use exactly what is in the env to be safe.
-    let apiKey = OPENROUTER_API_KEY;
-    if (apiKey && !apiKey.startsWith('sk-or-v1-') && apiKey.length > 50) {
-      apiKey = \`sk-or-v1-\${apiKey}\`;
-    }
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": \`Bearer \${apiKey}\`,
-        "HTTP-Referer": window.location.origin, 
-        "X-Title": "PresentIQ",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        "model": "meta-llama/llama-3-8b-instruct:free",
-        "messages": [
-          { "role": "user", "content": prompt }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenRouter API error:", response.status, errorText);
-      throw new Error(\`API returned status \${response.status}\`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
   } catch (error) {
     console.error("Failed to generate AI insight:", error);
     return "AI Insight could not be generated at this time.";
