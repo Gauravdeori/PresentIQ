@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Class, ClassMembership, ClassAttendanceRecord, AttendanceSession } from '@/types/classes';
 
@@ -48,7 +48,7 @@ export const generateAttendanceReport = (data: ReportData, format: 'pdf' | 'exce
         throw new Error("No student data available to generate report.");
       }
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 50,
         head: [['Roll No', 'Student Name', 'Attended', 'Total', 'Percentage', 'Status']],
         body: tableRows,
