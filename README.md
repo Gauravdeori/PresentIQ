@@ -1,4 +1,4 @@
-# PresentIQ — Attendance Management System
+# PresentIQ - Attendance Management System
 
 PresentIQ is a role-based attendance management platform designed for educational institutions, teachers, and students. Built with a cool light design system, it provides administrative tools, active tracking sessions, and student self-tracking dashboards.
 
@@ -42,3 +42,7 @@ PresentIQ is a role-based attendance management platform designed for educationa
 ## Author
 
 **Gaurav Deori**
+
+## Employee
+
+**Arjun Bora**
