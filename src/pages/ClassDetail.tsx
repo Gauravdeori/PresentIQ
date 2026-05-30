@@ -292,7 +292,7 @@ export default function ClassDetail() {
         const studentRecords = records.filter(r => r.studentId === m.userId && r.status === 'present');
         const attended = studentRecords.length;
         return {
-          name: m.studentName || `User ${m.userId.substring(0, 5)}`,
+          name: m.studentName || `User ${m?.userId?.substring(0, 5) || 'Unknown'}`,
           rollNumber: m.rollNumber || 'N/A',
           attended,
           total: totalSessions,
@@ -704,7 +704,7 @@ export default function ClassDetail() {
                         <div className="flex items-center gap-4">
                           <Avatar className="h-10 w-10 border-2 border-border/50">
                             <AvatarFallback className="bg-primary/5 text-primary font-black uppercase">
-                              {m.userId.substring(0, 1)}
+                              {(m.studentName || m.userId || "?").substring(0, 1)}
                             </AvatarFallback>
                           </Avatar>
                           <div>
